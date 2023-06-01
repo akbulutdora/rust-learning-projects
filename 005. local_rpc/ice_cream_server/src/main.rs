@@ -5,21 +5,7 @@ use tokio::time::{self, Duration, Instant};
 struct ClientRequest {
     message: String,
     tx: oneshot::Sender<String>,
-    // TODO: New fields
-    // query: ,
 }
-
-/*
-    Arbitrary operations:
-    - how many flavors?
-    - what flavors do you have that start with the letter "F"?
-    - what kind of chocolate do you have?
-    - do you have non-dairy ice cream?
-    - are you making more of vanilla?
-
-    https://doc.rust-lang.org/std/ops/trait.FnOnce.html
-    keywords: trait objects,
-*/
 
 #[tokio::main]
 async fn main() {
@@ -52,7 +38,7 @@ async fn run_server(mut rx: mpsc::Receiver<ClientRequest>) {
             }
             Some(ClientRequest { message, tx }) = rx.recv() => {
                 println!("SERVER; received: {:?}", message);
-                // fn.call(m)
+
                 let response = format!("Here is your ice cream! I have {ice_cream_amount} left!");
                 tx.send(response).unwrap();
             }
