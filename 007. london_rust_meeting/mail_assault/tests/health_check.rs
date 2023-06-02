@@ -1,7 +1,5 @@
 use std::net::TcpListener;
 
-use mail_assault::run;
-
 #[tokio::test]
 
 async fn health_check_works() {
