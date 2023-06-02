@@ -1,1 +1,1 @@
-This project was an extension to local_rpc. You can find the design and implementation processes [here](https://akbulutdora.github.io/posts/rust/002_requesting_arbitrary_data.html).
+This project was an extension to my practice project `local_rpc`. You can find the design and implementation processes [here](https://akbulutdora.github.io/posts/rust/002_requesting_arbitrary_data.html).
