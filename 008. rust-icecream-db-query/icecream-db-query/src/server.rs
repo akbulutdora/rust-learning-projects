@@ -41,7 +41,7 @@ pub async fn run_server(mut rx: mpsc::Receiver<Query>) {
 
     database.flavors_stock.append(&mut vec![Flavor::Watermelon]);
 
-    println!("SERVER; I will give one person some ice cream!");
+    println!("SERVER; I will speak of truth! You can ask only two questions!");
     let mut ice_cream_amount = 50;
     let mut interval = time::interval_at(
         Instant::now() + Duration::from_secs(1),
@@ -52,7 +52,7 @@ pub async fn run_server(mut rx: mpsc::Receiver<Query>) {
         tokio::select! {
             _ = interval.tick() => {
                 if ice_cream_amount < 10 {
-                    println!("SERVER; no more ice cream!");
+                    println!("SERVER; enough! This is how much you get from my wisdom.");
                     return;
                 }
                 ice_cream_amount -= 10;
