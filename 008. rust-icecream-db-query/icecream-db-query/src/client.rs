@@ -3,8 +3,9 @@ use crate::server::{Database, Flavor};
 use tokio::sync::mpsc;
 
 async fn query_recipe_exists(tx: &mpsc::Sender<Query>) {
-    let (q, response_rx) =
-        Query::new(|database: &Database| database.flavor_recipes.contains_key(&Flavor::Chocolate));
+    let (q, response_rx) = Query::from_request(|database: &Database| {
+        database.flavor_recipes.contains_key(&Flavor::Chocolate)
+    });
     tx.send(q).await.expect("CLIENT; can not send on channel");
     match response_rx.await {
         Ok(value) => println!(
@@ -15,7 +16,7 @@ async fn query_recipe_exists(tx: &mpsc::Sender<Query>) {
     }
 }
 async fn query_flavors_in_stock(tx: &mpsc::Sender<Query>) {
-    let (q, response_rx) = Query::new(|database: &Database| {
+    let (q, response_rx) = Query::from_request(|database: &Database| {
         database
             .flavors_stock
             .iter()

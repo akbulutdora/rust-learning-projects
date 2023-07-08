@@ -57,15 +57,11 @@ pub async fn run_server(mut rx: mpsc::Receiver<Query>) {
                 }
                 ice_cream_amount -= 10;
             }
-            Some(query) = rx.recv() => {
+            query = rx.recv() => {
                 println!("SERVER; received the query.");
 
-                query.execute(&mut database);
+                query.unwrap().execute(&mut database);
                 println!("SERVER; executed query.")
-            }
-            else => {
-                println!("SERVER; I don't know what's happening here!");
-                break;
             }
         }
     }

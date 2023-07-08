@@ -9,10 +9,10 @@ pub struct Query {
 /// [Query::new] constructor needs to take a closure of type [FnOnce(&Database) -> T + Send + 'static]
 /// it should return a receiver as well as the query object
 impl Query {
-    pub fn new<T, F>(f: F) -> (Self, oneshot::Receiver<T>)
+    pub fn from_request<T, F>(f: F) -> (Self, oneshot::Receiver<T>)
     where
         F: FnOnce(&Database) -> T + Send + 'static,
-        T: Debug + Send + 'static,
+        T: Send + 'static,
     {
         let (tx, rx) = oneshot::channel();
         let execute_and_send = Box::new(move |database: &Database| {
