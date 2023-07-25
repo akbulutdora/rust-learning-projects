@@ -1,16 +1,24 @@
 use tokio::sync::mpsc;
 
-pub struct Actor<T, A, M> {
+pub trait ActorState {
+    type Message: Send;
+}
+
+pub struct Actor<T, A>
+where
+    T: ActorState,
+{
     state: T,
-    receiver: mpsc::UnboundedReceiver<M>,
+    receiver: mpsc::UnboundedReceiver<T::Message>,
     action: A,
 }
 
-impl<T, A, M> Actor<T, A, M>
+impl<T, A> Actor<T, A>
 where
-    A: Send + FnMut(&mut T, M) -> (),
+    T: 'static + Send + ActorState,
+    A: Send + FnMut(&mut T, T::Message) -> (),
 {
-    pub fn new(state: T, action: A) -> (mpsc::UnboundedSender<M>, Self) {
+    pub fn new(state: T, action: A) -> (mpsc::UnboundedSender<T::Message>, Self) {
         let (sender, receiver) = mpsc::unbounded_channel();
         (
             sender,
@@ -23,8 +31,8 @@ where
     }
 
     pub async fn run(mut self) {
-        while let Some(message) = self.receiver.recv().await {
-            (self.action)(&mut self.state, message);
+        while let Some(msg) = self.receiver.recv().await {
+            (self.action)(&mut self.state, msg);
         }
     }
 }
