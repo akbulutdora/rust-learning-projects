@@ -8,24 +8,26 @@ pub trait ActorState {
     type Message: Send;
 }
 
-pub struct Actor<T, A, F>
+pub struct Actor<T, A, F, G>
 where
     T: ActorState,
 {
     state: T,
     receiver: mpsc::UnboundedReceiver<T::Message>,
     action: A,
-    futures: Vec<F>,
+    futures: Vec<(F, G)>,
 }
 
-impl<T, A, F, Fut> Actor<T, A, F>
+impl<T, A, F, G, Fut, Gut> Actor<T, A, F, G>
 where
-    T: 'static + Send + ActorState,
-    A: Send + FnMut(&mut T, T::Message) -> (),
-    F: 'static + Send + Fn(&T) -> Fut,
-    Fut: std::future::Future + Send,
+    T: Send + ActorState,
+    A: Send + FnMut(&mut T, T::Message),
+    F: Send + Fn(&T) -> Fut,
+    G: Send + Fn(&T) -> Gut,
+    Fut: std::future::Future<Output = ()> + Send,
+    Gut: std::future::Future<Output = ()> + Send,
 {
-    pub fn builder(state: T, action: A) -> ActorBuilder<T, A, F, Fut> {
+    pub fn builder(state: T, action: A) -> ActorBuilder<T, A, F, G, Fut, Gut> {
         ActorBuilder::new(state, action)
     }
 
@@ -41,7 +43,7 @@ where
             .futures
             .iter()
             .enumerate()
-            .map(|(index, fut)| (fut)(&self.state).map(mapped_index(index)))
+            .map(|(index, (fut, _))| (fut)(&self.state).map(mapped_index(index)))
             .collect();
         loop {
             tokio::select! {
@@ -51,42 +53,40 @@ where
                 },
                 Some(x) = futs_unordered.next() =>
                     {
-                        let index = (x)(()).into_inner();
-                        let old_fut = &self.futures[index];
+                        let index = x.into_inner();
+                        let (old_fut, then) = &self.futures[index];
+                        (then)(&self.state).await;
                         let new_fut = (old_fut)(&self.state).map(mapped_index(index));
                         futs_unordered.push(new_fut);
-                        println!("got one");
                     },
-
-                // data = fut => {
-                //     // <- 2. call the future again so that it will be polled again and again periodically
-                //     fut = (&self.get_future)(&self.state);
-                //     (self.process_future_data)(&mut self.state, data)
-                // }
             }
         }
     }
 }
 
-pub struct ActorBuilder<T, A, F, Fut>
+pub struct ActorBuilder<T, A, F, G, Fut, Gut>
 where
     T: ActorState,
     F: Fn(&T) -> Fut,
+    G: Fn(&T) -> Gut,
     Fut: std::future::Future + Send,
+    Gut: std::future::Future + Send,
 {
     state: T,
     action: A,
-    futures: Vec<F>,
+    futures: Vec<(F, G)>,
     sender: mpsc::UnboundedSender<T::Message>,
     receiver: mpsc::UnboundedReceiver<T::Message>,
 }
 
-impl<T, A, F, Fut> ActorBuilder<T, A, F, Fut>
+impl<T, A, F, G, Fut, Gut> ActorBuilder<T, A, F, G, Fut, Gut>
 where
-    T: 'static + Send + ActorState,
-    A: Send + FnMut(&mut T, T::Message) -> (),
-    F: 'static + Send + Fn(&T) -> Fut,
+    T: Send + ActorState,
+    A: Send + FnMut(&mut T, T::Message),
+    F: Send + Fn(&T) -> Fut,
+    G: Send + Fn(&T) -> Gut,
     Fut: std::future::Future + Send,
+    Gut: std::future::Future + Send,
 {
     pub fn new(state: T, action: A) -> Self {
         let (sender, receiver) = mpsc::unbounded_channel();
@@ -99,14 +99,12 @@ where
         }
     }
 
-    pub fn future<'a>(mut self, get_future: F) -> Self {
-        // self.get_future = Some(get_future);
-        self.futures.push(get_future);
+    pub fn chain_behavior(mut self, when: F, then: G) -> Self {
+        self.futures.push((when, then));
         self
     }
 
-    pub fn build(self) -> (mpsc::UnboundedSender<T::Message>, Actor<T, A, F>) {
-        // let cl = self.clone();
+    pub fn build(self) -> (mpsc::UnboundedSender<T::Message>, Actor<T, A, F, G>) {
         let actor = Actor {
             state: self.state,
             receiver: self.receiver,

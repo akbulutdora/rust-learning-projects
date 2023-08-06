@@ -13,16 +13,18 @@ pub struct Client<T: ActorState> {
 
 impl<T> Client<T>
 where
-    T: 'static + Send + ActorState,
+    T: Send + ActorState + 'static + Sync,
 {
-    pub fn new<F, Fut, A>(actor_builder: ActorBuilder<T, A, F, Fut>) -> Self
+    pub fn new<F, G, Fut, Gut, A>(actor_builder: ActorBuilder<T, A, F, G, Fut, Gut>) -> Self
     where
-        A: Send + FnMut(&mut T, T::Message) -> () + 'static,
-        F: 'static + Send + Fn(&T) -> Fut,
-        Fut: std::future::Future + Send + 'static,
+        A: Send + FnMut(&mut T, T::Message) + 'static,
+        F: Send + Fn(&T) -> Fut + 'static + Sync,
+        G: Send + Fn(&T) -> Gut + 'static + Sync,
+        Fut: std::future::Future<Output = ()> + Send + 'static,
+        Gut: std::future::Future<Output = ()> + Send + 'static,
     {
         let handle: mpsc::UnboundedSender<T::Message>;
-        let actor: Actor<T, A, F>;
+        let actor: Actor<T, A, F, G>;
 
         (handle, actor) = actor_builder.build();
         tokio::spawn(actor.perform());
