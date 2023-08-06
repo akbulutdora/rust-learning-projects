@@ -6,7 +6,7 @@ use std::collections::HashMap;
 
 use crate::actor::ActorState;
 
-pub struct Cache(HashMap<usize, String>);
+pub struct Cache(pub HashMap<usize, String>);
 
 pub enum CacheMessage {
     Insert(OneshotSender<Option<String>>, usize, String),
@@ -36,20 +36,32 @@ where
     }
 }
 
-pub fn cache_action(_cache: &mut Cache, _msg: CacheMessage) {}
+pub fn cache_action(_cache: &mut Cache, _msg: CacheMessage) -> () {}
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashMap;
+    use std::{collections::HashMap, time::Duration};
 
-    use crate::client::Client;
+    use tokio::time;
+
+    use crate::{actor::ActorBuilder, client::Client};
 
     use super::{cache_action, Cache};
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+    async fn wait(millis: u64) -> u64 {
+        time::sleep(Duration::from_millis(millis)).await;
+        millis
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 5)]
     async fn cache_usability() {
-        let client = Client::new(Cache(HashMap::new()), cache_action);
+        let actor_state = Cache(HashMap::new());
+        let actor_builder = ActorBuilder::new(actor_state, cache_action).future(|_| wait(10));
+        let client = Client::new(actor_builder);
         client.send_msg((0, "test".to_string()));
         client.send_msg((0, |cache: &Cache| cache.0.len()));
+
+        wait(10000).await;
+        assert!(true)
     }
 }

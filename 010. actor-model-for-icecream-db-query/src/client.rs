@@ -1,13 +1,12 @@
-use tokio::sync::{
-    mpsc,
-    oneshot::{self, channel as oneshot_channel},
-};
+use crate::actor::Actor;
+use crate::actor::ActorBuilder;
+use crate::actor::ActorState;
+use crate::tracker::Tracker;
+use tokio::sync::mpsc;
 
-use crate::{
-    actor::{Actor, ActorState},
-    tracker::Tracker,
-};
+use tokio::sync::oneshot;
 
+use tokio::sync::oneshot::channel as oneshot_channel;
 pub struct Client<T: ActorState> {
     handle: mpsc::UnboundedSender<T::Message>,
 }
@@ -16,12 +15,17 @@ impl<T> Client<T>
 where
     T: 'static + Send + ActorState,
 {
-    pub fn new<F>(state: T, action: F) -> Self
+    pub fn new<F, Fut, A>(actor_builder: ActorBuilder<T, A, F, Fut>) -> Self
     where
-        F: 'static + Send + FnMut(&mut T, <T as ActorState>::Message),
+        A: Send + FnMut(&mut T, T::Message) -> () + 'static,
+        F: 'static + Send + Fn(&T) -> Fut,
+        Fut: std::future::Future + Send + 'static,
     {
-        let (handle, actor) = Actor::new(state, action);
-        tokio::spawn(actor.run());
+        let handle: mpsc::UnboundedSender<T::Message>;
+        let actor: Actor<T, A, F>;
+
+        (handle, actor) = actor_builder.build();
+        tokio::spawn(actor.perform());
         Self { handle }
     }
 
